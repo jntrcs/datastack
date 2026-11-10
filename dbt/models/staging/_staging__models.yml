@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: stg_app_store__sales
+    description: Apple daily sales report lines, typed, latest load of each file only.
+    columns:
+      - name: sales_line_id
+        data_tests: [unique, not_null]
+      - name: report_date
+        data_tests: [not_null]
+      - name: units
+        data_tests: [not_null]
+      - name: product_type_identifier
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('app_store_product_types')
+                field: product_type_identifier
+              config:
+                severity: warn   # a new Apple code shouldn't break the build; it should be noticed
+
+  - name: stg_cloudflare__pageloads
+    description: Cloudflare Web Analytics page-load groups, one row per group per day.
+    columns:
+      - name: pageload_group_id
+        data_tests: [unique, not_null]
+      - name: visit_date
+        data_tests: [not_null]
+      - name: pageviews
+        data_tests: [not_null]
+      - name: sample_interval
+        description: 1 = exact counts; >1 = Cloudflare sampled and scaled the counts.

@@ -1,0 +1,30 @@
+version: 2
+
+sources:
+  - name: app_store
+    database: RAW
+    schema: APP_STORE
+    description: App Store Connect reports for Chronic Health, loaded untouched from R2.
+    # `dbt source freshness` fails if the nightly load stops arriving.
+    config:
+      loaded_at_field: _loaded_at
+      freshness:
+        warn_after: {count: 36, period: hour}
+        error_after: {count: 72, period: hour}
+    tables:
+      - name: sales_daily
+        description: >
+          Apple's daily SALES/SUMMARY report, one row per (product type, country,
+          device, version, ...) per day, ALL columns as text. A file can be loaded
+          more than once if the extractor re-pulled it with different bytes.
+        columns:
+          - name: begin_date
+            description: Report day, MM/DD/YYYY (Pacific time, as Apple reports it).
+          - name: product_type_identifier
+            description: Apple's code for the kind of transaction (download, redownload, update...).
+          - name: units
+            description: Count of transactions in the row (text; may be negative for refunds).
+          - name: _source_file
+            description: R2 path of the file this row came from.
+          - name: _loaded_at
+            description: When COPY INTO loaded the row.

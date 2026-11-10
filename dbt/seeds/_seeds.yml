@@ -1,0 +1,21 @@
+version: 2
+
+seeds:
+  - name: app_store_product_types
+    description: >
+      Apple's Product Type Identifier codes mapped to what they mean. A seed is a
+      small, version-controlled CSV that dbt loads as a table, which is the right
+      home for reference data that changes rarely and is owned by the team.
+      If Apple sends a code not listed here, the relationships test on
+      stg_app_store__sales warns.
+    config:
+      column_types:
+        product_type_identifier: varchar
+    columns:
+      - name: product_type_identifier
+        data_tests: [unique, not_null]
+      - name: event_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [first_download, redownload, update]

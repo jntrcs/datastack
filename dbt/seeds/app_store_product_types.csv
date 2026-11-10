@@ -1,0 +1,13 @@
+product_type_identifier,description,platform,event_type
+1,Free or paid app,iPhone,first_download
+1F,Free or paid app,Universal,first_download
+1T,Free or paid app,iPad,first_download
+F1,Free or paid app,Mac,first_download
+3,Redownload,iPhone,redownload
+3F,Redownload,Universal,redownload
+3T,Redownload,iPad,redownload
+F3,Redownload,Mac,redownload
+7,Update,iPhone,update
+7F,Update,Universal,update
+7T,Update,iPad,update
+F7,Update,Mac,update

@@ -5,3 +5,8 @@ __pycache__/
 # Local landing zone (raw extracts before R2 is set up)
 data/
 .DS_Store
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+logs/
+dbt/.user.yml

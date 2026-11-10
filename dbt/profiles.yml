@@ -1,0 +1,24 @@
+# Connection settings. Everything comes from environment variables (.env locally,
+# GitHub secrets in CI) so this file is safe to commit.
+#
+#   dev  -> your own sandbox schemas: ANALYTICS.DBT_DEV_STAGING, ANALYTICS.DBT_DEV_MARTS
+#   prod -> the real thing:           ANALYTICS.STAGING,         ANALYTICS.MARTS
+# Developing in dev means you can break things without breaking anyone's dashboard.
+datastack:
+  target: "{{ env_var('DBT_TARGET', 'dev') }}"
+  outputs:
+    dev: &base
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('DBT_SNOWFLAKE_USER', env_var('SNOWFLAKE_USER', '')) }}"
+      authenticator: snowflake_jwt
+      private_key_path: "{{ env_var('DBT_SNOWFLAKE_PRIVATE_KEY_PATH', env_var('SNOWFLAKE_PRIVATE_KEY_PATH', '')) }}"
+      private_key: "{{ env_var('DBT_SNOWFLAKE_PRIVATE_KEY', '') }}"
+      role: TRANSFORMER
+      warehouse: TRANSFORMING_WH
+      database: ANALYTICS
+      schema: DBT_DEV
+      threads: 4
+    prod:
+      <<: *base
+      schema: PROD

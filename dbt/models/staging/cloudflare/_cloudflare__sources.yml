@@ -1,0 +1,18 @@
+version: 2
+
+sources:
+  - name: cloudflare
+    database: RAW
+    schema: CLOUDFLARE
+    description: Cloudflare Web Analytics (jacksoncurtis.me), loaded untouched from R2.
+    config:
+      loaded_at_field: _loaded_at
+      freshness:
+        warn_after: {count: 36, period: hour}
+        error_after: {count: 72, period: hour}
+    tables:
+      - name: web_analytics_daily
+        description: >
+          One row per extracted file (= one UTC day). `record` holds the GraphQL
+          request and the full response; the page-load groups are in
+          record:response:data:viewer:accounts[0]:rumPageloadEventsAdaptiveGroups.

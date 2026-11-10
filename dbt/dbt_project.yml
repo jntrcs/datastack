@@ -1,0 +1,28 @@
+name: datastack
+version: "1.0.0"
+profile: datastack
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+clean-targets: ["target", "dbt_packages"]
+
+# Layers (the standard dbt convention):
+#   staging  1:1 with raw tables. Rename, cast, dedupe. No business logic. Views (cheap).
+#   marts    Business-facing facts/dims at a clear grain. Tables (fast to query).
+models:
+  datastack:
+    staging:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table
+      # Analysts/dashboards (REPORTER role) can read marts, nothing else.
+      +grants:
+        select: ["REPORTER"]
+
+seeds:
+  datastack:
+    +schema: reference
