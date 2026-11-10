@@ -1,0 +1,80 @@
+-- Load raw files from R2 into RAW tables. Idempotent: safe to re-run nightly.
+--   uv run python -m warehouse.sf -f warehouse/sql/02_raw_load.sql
+--
+-- How re-runs behave: COPY INTO remembers which files it has loaded (by name +
+-- checksum, for 64 days) and skips them. The nightly extract re-pulls the last 5
+-- days; a re-pulled file whose bytes changed gets loaded AGAIN as new rows. So RAW
+-- can hold several versions of the same day -- dbt's staging models keep only
+-- the latest version per file (_loaded_at). Append-only raw + dedupe downstream is
+-- the standard ELT pattern.
+--
+-- Why not Snowpipe? It auto-loads on bucket event notifications, which R2 (as an
+-- s3compat stage) doesn't support. A COPY after each nightly extract does the same job.
+
+USE ROLE LOADER;
+USE WAREHOUSE LOADING_WH;
+USE SCHEMA RAW.LANDING;
+
+-- {{...}} placeholders are filled from .env / CI secrets by warehouse/sf.py.
+CREATE STAGE IF NOT EXISTS R2_RAW
+  URL = 's3compat://datastack-raw/raw/'
+  ENDPOINT = '{{R2_ACCOUNT_ID}}.r2.cloudflarestorage.com'
+  CREDENTIALS = (AWS_KEY_ID = '{{R2_ACCESS_KEY_ID}}' AWS_SECRET_KEY = '{{R2_SECRET_ACCESS_KEY}}')
+  COMMENT = 'The R2 landing bucket, raw/ prefix.';
+
+CREATE FILE FORMAT IF NOT EXISTS TSV_GZ_HEADER
+  TYPE = CSV FIELD_DELIMITER = '\t' SKIP_HEADER = 1 COMPRESSION = GZIP
+  FIELD_OPTIONALLY_ENCLOSED_BY = NONE EMPTY_FIELD_AS_NULL = TRUE TRIM_SPACE = TRUE;
+
+CREATE FILE FORMAT IF NOT EXISTS JSON_DOC TYPE = JSON;
+
+-- ---------------------------------------------------------------- App Store sales
+-- Every column as text, named like Apple's header. Typing happens in dbt.
+CREATE TABLE IF NOT EXISTS RAW.APP_STORE.SALES_DAILY (
+  provider VARCHAR, provider_country VARCHAR, sku VARCHAR, developer VARCHAR,
+  title VARCHAR, version VARCHAR, product_type_identifier VARCHAR, units VARCHAR,
+  developer_proceeds VARCHAR, begin_date VARCHAR, end_date VARCHAR,
+  customer_currency VARCHAR, country_code VARCHAR, currency_of_proceeds VARCHAR,
+  apple_identifier VARCHAR, customer_price VARCHAR, promo_code VARCHAR,
+  parent_identifier VARCHAR, subscription VARCHAR, period VARCHAR, category VARCHAR,
+  cmb VARCHAR, device VARCHAR, supported_platforms VARCHAR, proceeds_reason VARCHAR,
+  preserved_pricing VARCHAR, client VARCHAR, order_type VARCHAR,
+  contingent_app_name VARCHAR,
+  _source_file VARCHAR, _source_file_modified TIMESTAMP_TZ, _source_row NUMBER,
+  _loaded_at TIMESTAMP_TZ
+);
+
+COPY INTO RAW.APP_STORE.SALES_DAILY
+FROM (
+  SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
+         $21,$22,$23,$24,$25,$26,$27,$28,$29,
+         METADATA$FILENAME, METADATA$FILE_LAST_MODIFIED, METADATA$FILE_ROW_NUMBER,
+         CURRENT_TIMESTAMP()
+  FROM @R2_RAW/app_store/sales_daily/
+)
+PATTERN = '.*/sales[.]tsv[.]gz'
+FILE_FORMAT = (FORMAT_NAME = TSV_GZ_HEADER);
+
+-- ------------------------------------------------------- Cloudflare Web Analytics
+-- One row per file, the whole JSON document in a VARIANT column. dbt flattens it.
+CREATE TABLE IF NOT EXISTS RAW.CLOUDFLARE.WEB_ANALYTICS_DAILY (
+  record VARIANT,
+  _source_file VARCHAR, _source_file_modified TIMESTAMP_TZ, _loaded_at TIMESTAMP_TZ
+);
+
+COPY INTO RAW.CLOUDFLARE.WEB_ANALYTICS_DAILY
+FROM (
+  SELECT $1, METADATA$FILENAME, METADATA$FILE_LAST_MODIFIED, CURRENT_TIMESTAMP()
+  FROM @R2_RAW/cloudflare/web_analytics_daily/
+)
+PATTERN = '.*/pageloads[.]json'
+FILE_FORMAT = (FORMAT_NAME = JSON_DOC);
+
+-- ------------------------------------------------------------------ summary
+SELECT 'app_store.sales_daily' AS tbl, COUNT(*) AS rows_, COUNT(DISTINCT _source_file) AS files,
+       MIN(begin_date) AS first_, MAX(_loaded_at) AS last_loaded
+FROM RAW.APP_STORE.SALES_DAILY
+UNION ALL
+SELECT 'cloudflare.web_analytics_daily', COUNT(*), COUNT(DISTINCT _source_file),
+       MIN(record:variables:date::STRING), MAX(_loaded_at)
+FROM RAW.CLOUDFLARE.WEB_ANALYTICS_DAILY;
