@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+.env
+*.p8
+# Local landing zone (raw extracts before R2 is set up)
+data/
+.DS_Store

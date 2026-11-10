@@ -1,0 +1,42 @@
+name: Nightly extract
+
+on:
+  schedule:
+    # 14:00 UTC = 7am MST / 8am MDT. Apple has usually published yesterday's
+    # sales report by then; Cloudflare's UTC day ended 14 hours earlier.
+    - cron: "0 14 * * *"
+  workflow_dispatch: {}  # "Run workflow" button for manual runs
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LANDING: r2://datastack-raw
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_VENDOR_NUMBER: ${{ secrets.ASC_VENDOR_NUMBER }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+      CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+
+      # Re-pull the last 5 days every night. Writes are idempotent (same day ->
+      # same file), so this picks up late Apple reports and heals a missed night.
+      - name: Date window
+        run: |
+          echo "START=$(date -u -d '5 days ago' +%F)" >> "$GITHUB_ENV"
+          echo "END=$(date -u -d '1 day ago' +%F)" >> "$GITHUB_ENV"
+
+      - name: App Store sales
+        run: uv run python -m extract.asc_sales "$START" "$END"
+
+      - name: Cloudflare Web Analytics
+        if: always()  # run even if the Apple step failed
+        run: uv run python -m extract.cf_web_analytics "$START" "$END"
