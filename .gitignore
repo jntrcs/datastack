@@ -10,3 +10,5 @@ dbt/dbt_packages/
 dbt/logs/
 logs/
 dbt/.user.yml
+# Working notes stay local (they reference account IDs / logins).
+*.md
