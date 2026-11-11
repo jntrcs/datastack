@@ -97,3 +97,24 @@ models:
         data_tests: [not_null]
       - name: sample_interval
         description: 1 = exact counts; >1 = Cloudflare sampled and scaled the counts.
+
+  - name: stg_app_store__ratings
+    description: Rating count and average per storefront per day (from daily lookup files).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [snapshot_date, country_code]
+    columns:
+      - name: average_rating
+        description: 1-5 stars; NULL when the storefront has no ratings.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 5
+
+  - name: stg_app_store__ratings_current
+    description: Latest extract only, storefronts with >= 1 rating. Input to the ratings snapshot.
+    columns:
+      - name: country_code
+        data_tests: [unique, not_null]

@@ -48,6 +48,11 @@ jobs:
         if: always()
         run: uv run python -m extract.asc_analytics
 
+      # Current ratings only (Apple has no history), so a missed night is a lost day.
+      - name: App Store ratings (every storefront)
+        if: always()
+        run: uv run python -m extract.app_store_ratings
+
       - name: Cloudflare Web Analytics
         if: always()  # run even if the Apple step failed
         run: uv run python -m extract.cf_web_analytics "$START" "$END"

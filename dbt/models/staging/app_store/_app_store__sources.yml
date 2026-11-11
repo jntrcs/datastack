@@ -72,3 +72,9 @@ sources:
         description: >
           "App Sessions Standard": in-app sessions, total duration (seconds) and unique
           devices, by app version, device, OS, source, page type, download date, territory.
+
+      - name: ratings_daily
+        description: >
+          One row per day: Apple's public lookup response for every storefront, as JSON
+          ({app_id, extracted_at, storefronts: [{country, response}]}). Apple only
+          serves the current rating, so these daily files are the only history.

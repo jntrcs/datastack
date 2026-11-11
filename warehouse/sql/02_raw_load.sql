@@ -135,6 +135,22 @@ FROM (
 PATTERN = '.*/segment_[0-9]+[.]tsv[.]gz'
 FILE_FORMAT = (FORMAT_NAME = TSV_GZ_HEADER);
 
+-- ------------------------------------------------------- App Store ratings
+-- One row per daily file: Apple's lookup response for every storefront, as JSON.
+-- Apple only serves the CURRENT rating, so these daily files are the only history.
+CREATE TABLE IF NOT EXISTS RAW.APP_STORE.RATINGS_DAILY (
+  record VARIANT,
+  _source_file VARCHAR, _source_file_modified TIMESTAMP_TZ, _loaded_at TIMESTAMP_TZ
+);
+
+COPY INTO RAW.APP_STORE.RATINGS_DAILY
+FROM (
+  SELECT $1, METADATA$FILENAME, METADATA$FILE_LAST_MODIFIED, CURRENT_TIMESTAMP()
+  FROM @R2_RAW/app_store/ratings_daily/
+)
+PATTERN = '.*/ratings[.]json'
+FILE_FORMAT = (FORMAT_NAME = JSON_DOC);
+
 -- ------------------------------------------------------- Cloudflare Web Analytics
 -- One row per file, the whole JSON document in a VARIANT column. dbt flattens it.
 CREATE TABLE IF NOT EXISTS RAW.CLOUDFLARE.WEB_ANALYTICS_DAILY (

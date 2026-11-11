@@ -1,0 +1,34 @@
+# A dbt SNAPSHOT: history of a value that the source only shows as "current".
+#
+# Every `dbt snapshot` (and `dbt build`) run compares stg_app_store__ratings_current
+# to the newest saved row per country_code. If rating_count or average_rating
+# differ, it closes the old row (dbt_valid_to = now) and inserts a new one
+# (dbt_valid_from = now, dbt_valid_to = NULL). Unchanged rows are left alone.
+# Result: one row per VERSION of each country's rating (SCD Type 2).
+#
+# Unlike models, a snapshot table is STATE, not a rebuildable view of the source:
+# drop it and the history is gone. (Here RAW keeps every daily file too, so it could
+# be reconstructed, but most real sources don't give you that safety net.)
+snapshots:
+  - name: snap_app_store_ratings
+    relation: ref('stg_app_store__ratings_current')
+    description: Every version of each storefront's rating count/average, with validity dates.
+    config:
+      schema: snapshots
+      unique_key: country_code
+      # `check`: compare these columns, since Apple gives no reliable "updated at".
+      # (`timestamp` strategy would use extracted_at, which changes every day, and
+      # record a new version daily even when nothing changed.)
+      strategy: check
+      check_cols: [rating_count, average_rating]
+      # A storefront that disappears from the input gets its row closed, not left "current".
+      hard_deletes: invalidate
+      grants:
+        select: ["REPORTER"]
+    columns:
+      - name: country_code
+        data_tests: [not_null]
+      - name: dbt_valid_from
+        description: When this version was first seen (snapshot run time, not Apple's time).
+      - name: dbt_valid_to
+        description: When it was replaced. NULL = the current version.
