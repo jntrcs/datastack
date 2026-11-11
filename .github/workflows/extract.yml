@@ -42,6 +42,12 @@ jobs:
       - name: App Store sales
         run: uv run python -m extract.asc_sales "$START" "$END"
 
+      # Apple keeps only ~35 days of these, so a missed week is recoverable but a
+      # missed month is not. Defaults to the last 5 processing days.
+      - name: App Store analytics (impressions, page views, sessions)
+        if: always()
+        run: uv run python -m extract.asc_analytics
+
       - name: Cloudflare Web Analytics
         if: always()  # run even if the Apple step failed
         run: uv run python -m extract.cf_web_analytics "$START" "$END"

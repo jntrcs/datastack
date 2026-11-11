@@ -34,6 +34,58 @@ models:
               config:
                 severity: warn   # a new Apple code shouldn't break the build; it should be noticed
 
+  - name: stg_app_store__discovery_engagement
+    description: >
+      App Store impressions, page views and taps (Analytics Reports), typed. Only the
+      latest file's rows for each event date (Apple restates dates in later files).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              [event_date, app_id, event, page_type, source_type, engagement_type,
+               device, platform_version, country_code]
+    columns:
+      - name: engagement_line_id
+        data_tests: [unique, not_null]
+      - name: event_date
+        data_tests: [not_null]
+      - name: event
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [Impression, Page view, Tap]
+              config:
+                severity: warn   # a new Apple event type should be noticed, not break the build
+      - name: unique_counts
+        description: Unique devices for this line. Not additive across lines.
+
+  - name: stg_app_store__analytics_downloads
+    description: >
+      Downloads from the Analytics Reports (with source/page attribution), typed, latest
+      file per event date. Counts differ slightly from the Sales report day to day.
+    columns:
+      - name: download_line_id
+        data_tests: [unique, not_null]
+      - name: event_date
+        data_tests: [not_null]
+      - name: download_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [First-time download, Redownload, Auto-update, Manual update, Restore]
+              config:
+                severity: warn
+
+  - name: stg_app_store__sessions
+    description: In-app sessions (Analytics Reports), typed, latest file per event date.
+    columns:
+      - name: session_line_id
+        data_tests: [unique, not_null]
+      - name: event_date
+        data_tests: [not_null]
+      - name: total_session_seconds
+        description: Sum of session lengths in seconds for this line.
+
   - name: stg_cloudflare__pageloads
     description: Cloudflare Web Analytics page-load groups, one row per group per day.
     columns:

@@ -26,6 +26,34 @@ models:
       - name: is_sampled
         description: True when Cloudflare sampled the underlying data (counts are estimates).
 
+  - name: fct_app_store_funnel_daily
+    description: >
+      App Store funnel per day, source, country and device: impressions -> product page
+      views -> Get taps -> first-time downloads, all from Apple's Analytics Reports.
+      Starts ~2026-10-06 (Apple keeps ~35 days; we've kept every file since).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [event_date, app_id, source_type, country_code, device]
+    columns:
+      - name: source_type
+        description: How the user got there (App Store search, App Store browse, App referrer, Web referrer, Unavailable).
+      - name: impressions
+        description: Times the app was shown (search results, browse, product page...).
+      - name: product_page_views
+        description: Views of the app's product page.
+      - name: get_taps
+        description: Taps on Get (from search results or the product page). Download intent.
+      - name: first_time_downloads
+        description: First-time downloads per the Analytics Reports (use the Sales report for official counts).
+
+  - name: fct_app_sessions_daily
+    description: In-app sessions and total session time per day, app version, device and country.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [event_date, app_id, app_version, device, country_code]
+
   - name: daily_kpis
     description: >
       One row per day since launch (2026-04-02): App Store downloads next to website
@@ -50,3 +78,13 @@ models:
                 values: [published, no_sales, pending]
       - name: chronic_health_page_views
         description: Page views of /projects/chronic-health on jacksoncurtis.me.
+      - name: app_store_impressions
+        description: App Store impressions (Analytics Reports). NULL before coverage (~2026-10-06).
+      - name: app_store_product_page_views
+        description: App Store product page views. NULL before coverage.
+      - name: app_store_funnel_downloads
+        description: >
+          First-time downloads per the Analytics Reports, for funnel ratios only.
+          first_time_downloads (Sales report) is the official count.
+      - name: app_sessions
+        description: In-app sessions. NULL before coverage.

@@ -43,3 +43,32 @@ sources:
             description: Object checksum; a re-pulled file with new bytes gets a new row.
           - name: _listed_at
             description: When the load job first saw this (path, md5).
+
+      # ---- Analytics Reports (from the ONGOING analytics report request) ----
+      # One file per PROCESSING date. Apple restates each event date in later files
+      # (observed: date D appears in the D+1 and D+2 files with identical totals), so
+      # rows must NOT be summed across files: staging keeps the latest file per date.
+      - name: analytics_discovery_engagement
+        description: >
+          "App Store Discovery and Engagement Standard": impressions, page views and
+          taps on the App Store, by event, page type, source, engagement, device,
+          OS version and territory. All columns text.
+        columns:
+          - name: date
+            description: Event date, YYYY-MM-DD.
+          - name: event
+            description: Impression, Page view, or Tap.
+          - name: counts
+            description: Number of events in the row.
+          - name: unique_counts
+            description: Unique devices in the row. NOT additive across rows.
+          - name: _source_file
+            description: R2 path; contains processing_date=YYYY-MM-DD.
+      - name: analytics_downloads
+        description: >
+          "App Downloads Standard": downloads by type (first-time, redownload, updates,
+          restore), app version, device, OS, source, page type and territory.
+      - name: analytics_sessions
+        description: >
+          "App Sessions Standard": in-app sessions, total duration (seconds) and unique
+          devices, by app version, device, OS, source, page type, download date, territory.

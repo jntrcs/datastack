@@ -76,6 +76,65 @@ WHERE NOT EXISTS (
   WHERE f.file_path = l."name" AND f.md5 = l."md5"
 );
 
+-- ------------------------------------------------- App Store Analytics Reports
+-- One file per (report, PROCESSING date). A file can hold rows for several earlier
+-- event dates (`date` column), so dbt groups by `date`, not by file. Columns are
+-- positional, in Apple's header order (checked identical across all files 2026-11-11).
+CREATE TABLE IF NOT EXISTS RAW.APP_STORE.ANALYTICS_DISCOVERY_ENGAGEMENT (
+  date VARCHAR, app_name VARCHAR, app_apple_identifier VARCHAR, event VARCHAR,
+  page_type VARCHAR, source_type VARCHAR, engagement_type VARCHAR, device VARCHAR,
+  platform_version VARCHAR, territory VARCHAR, counts VARCHAR, unique_counts VARCHAR,
+  _source_file VARCHAR, _source_file_modified TIMESTAMP_TZ, _source_row NUMBER,
+  _loaded_at TIMESTAMP_TZ
+);
+
+COPY INTO RAW.APP_STORE.ANALYTICS_DISCOVERY_ENGAGEMENT
+FROM (
+  SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
+         METADATA$FILENAME, METADATA$FILE_LAST_MODIFIED, METADATA$FILE_ROW_NUMBER,
+         CURRENT_TIMESTAMP()
+  FROM @R2_RAW/app_store/analytics/discovery_engagement/
+)
+PATTERN = '.*/segment_[0-9]+[.]tsv[.]gz'
+FILE_FORMAT = (FORMAT_NAME = TSV_GZ_HEADER);
+
+CREATE TABLE IF NOT EXISTS RAW.APP_STORE.ANALYTICS_DOWNLOADS (
+  date VARCHAR, app_name VARCHAR, app_apple_identifier VARCHAR, download_type VARCHAR,
+  app_version VARCHAR, device VARCHAR, platform_version VARCHAR, source_type VARCHAR,
+  page_type VARCHAR, pre_order VARCHAR, territory VARCHAR, counts VARCHAR,
+  _source_file VARCHAR, _source_file_modified TIMESTAMP_TZ, _source_row NUMBER,
+  _loaded_at TIMESTAMP_TZ
+);
+
+COPY INTO RAW.APP_STORE.ANALYTICS_DOWNLOADS
+FROM (
+  SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
+         METADATA$FILENAME, METADATA$FILE_LAST_MODIFIED, METADATA$FILE_ROW_NUMBER,
+         CURRENT_TIMESTAMP()
+  FROM @R2_RAW/app_store/analytics/downloads/
+)
+PATTERN = '.*/segment_[0-9]+[.]tsv[.]gz'
+FILE_FORMAT = (FORMAT_NAME = TSV_GZ_HEADER);
+
+CREATE TABLE IF NOT EXISTS RAW.APP_STORE.ANALYTICS_SESSIONS (
+  date VARCHAR, app_name VARCHAR, app_apple_identifier VARCHAR, app_version VARCHAR,
+  device VARCHAR, platform_version VARCHAR, source_type VARCHAR, page_type VARCHAR,
+  app_download_date VARCHAR, territory VARCHAR, sessions VARCHAR,
+  total_session_duration VARCHAR, unique_devices VARCHAR,
+  _source_file VARCHAR, _source_file_modified TIMESTAMP_TZ, _source_row NUMBER,
+  _loaded_at TIMESTAMP_TZ
+);
+
+COPY INTO RAW.APP_STORE.ANALYTICS_SESSIONS
+FROM (
+  SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
+         METADATA$FILENAME, METADATA$FILE_LAST_MODIFIED, METADATA$FILE_ROW_NUMBER,
+         CURRENT_TIMESTAMP()
+  FROM @R2_RAW/app_store/analytics/sessions/
+)
+PATTERN = '.*/segment_[0-9]+[.]tsv[.]gz'
+FILE_FORMAT = (FORMAT_NAME = TSV_GZ_HEADER);
+
 -- ------------------------------------------------------- Cloudflare Web Analytics
 -- One row per file, the whole JSON document in a VARIANT column. dbt flattens it.
 CREATE TABLE IF NOT EXISTS RAW.CLOUDFLARE.WEB_ANALYTICS_DAILY (
@@ -98,4 +157,13 @@ FROM RAW.APP_STORE.SALES_DAILY
 UNION ALL
 SELECT 'cloudflare.web_analytics_daily', COUNT(*), COUNT(DISTINCT _source_file),
        MIN(record:variables:date::STRING), MAX(_loaded_at)
-FROM RAW.CLOUDFLARE.WEB_ANALYTICS_DAILY;
+FROM RAW.CLOUDFLARE.WEB_ANALYTICS_DAILY
+UNION ALL
+SELECT 'app_store.analytics_discovery_engagement', COUNT(*), COUNT(DISTINCT _source_file), MIN(date), MAX(_loaded_at)
+FROM RAW.APP_STORE.ANALYTICS_DISCOVERY_ENGAGEMENT
+UNION ALL
+SELECT 'app_store.analytics_downloads', COUNT(*), COUNT(DISTINCT _source_file), MIN(date), MAX(_loaded_at)
+FROM RAW.APP_STORE.ANALYTICS_DOWNLOADS
+UNION ALL
+SELECT 'app_store.analytics_sessions', COUNT(*), COUNT(DISTINCT _source_file), MIN(date), MAX(_loaded_at)
+FROM RAW.APP_STORE.ANALYTICS_SESSIONS;
