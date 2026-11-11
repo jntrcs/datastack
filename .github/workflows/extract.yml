@@ -4,7 +4,7 @@ on:
   schedule:
     # 14:00 UTC = 7am MST / 8am MDT. Apple has usually published yesterday's
     # sales report by then; Cloudflare's UTC day ended 14 hours earlier.
-    - cron: "3 16 * * *"  # TEMP test of schedule trigger; revert to an off-hour 14:xx
+    - cron: "17 14 * * *"  # off the top of the hour: GitHub delays :00 jobs most
   workflow_dispatch: {}  # "Run workflow" button for manual runs
 
 jobs:
