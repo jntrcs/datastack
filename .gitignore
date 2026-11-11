@@ -13,3 +13,5 @@ dbt/.user.yml
 # Working notes stay local (they reference account IDs / logins).
 *.md
 !README.md
+.wrangler/
+node_modules/

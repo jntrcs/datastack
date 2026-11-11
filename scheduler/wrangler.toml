@@ -1,0 +1,25 @@
+# Cloudflare Worker whose only job is to start the nightly GitHub Actions workflow.
+# Why: GitHub's own `schedule:` trigger never fired for this repo (0 runs across
+# several tests, private and public), while workflow_dispatch always works.
+# Cloudflare Cron Triggers call scheduled() below, which hits the same API the
+# "Run workflow" button uses.
+#
+# Deploy:   cd scheduler && npx wrangler@4 deploy
+# Secret:   GH_TOKEN = fine-grained PAT, this repo only, "Actions: Read and write"
+name = "datastack-scheduler"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+workers_dev = false
+
+[triggers]
+# 14:17 UTC = 7:17am MST / 8:17am MDT. Apple has usually published yesterday's
+# sales report by then; Cloudflare's UTC day ended 14 hours earlier.
+crons = ["17 14 * * *"]
+
+[vars]
+REPO = "jntrcs/datastack"
+WORKFLOW = "extract.yml"
+REF = "main"
+
+[observability]
+enabled = true
