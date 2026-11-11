@@ -55,6 +55,27 @@ FROM (
 PATTERN = '.*/sales[.]tsv[.]gz'
 FILE_FORMAT = (FORMAT_NAME = TSV_GZ_HEADER);
 
+-- File inventory: every object under app_store/sales_daily/, including the empty
+-- _NO_REPORT markers the extractor writes for settled days Apple returned 404 for.
+-- COPY can't load a zero-byte file as a row, so we record the stage LISTING instead.
+-- This is how the warehouse tells "Apple confirmed no sales" (marker) apart from
+-- "we have nothing for this day yet" (no object at all). Append-only, like COPY:
+-- a new row only when a (path, md5) pair hasn't been seen before.
+CREATE TABLE IF NOT EXISTS RAW.APP_STORE.SALES_DAILY_FILES (
+  file_path VARCHAR, size_bytes NUMBER, md5 VARCHAR, last_modified VARCHAR,
+  _listed_at TIMESTAMP_TZ
+);
+
+LIST @R2_RAW/app_store/sales_daily/;
+
+INSERT INTO RAW.APP_STORE.SALES_DAILY_FILES
+SELECT l."name", l."size", l."md5", l."last_modified", CURRENT_TIMESTAMP()
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) l
+WHERE NOT EXISTS (
+  SELECT 1 FROM RAW.APP_STORE.SALES_DAILY_FILES f
+  WHERE f.file_path = l."name" AND f.md5 = l."md5"
+);
+
 -- ------------------------------------------------------- Cloudflare Web Analytics
 -- One row per file, the whole JSON document in a VARIANT column. dbt flattens it.
 CREATE TABLE IF NOT EXISTS RAW.CLOUDFLARE.WEB_ANALYTICS_DAILY (

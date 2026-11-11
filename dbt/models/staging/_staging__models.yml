@@ -1,6 +1,20 @@
 version: 2
 
 models:
+  - name: stg_app_store__report_days
+    description: >
+      One row per day Apple has given us an answer for: 'published' (a sales report
+      exists) or 'no_sales' (Apple 404'd a settled day). Days missing here are unknown.
+    columns:
+      - name: report_date
+        data_tests: [unique, not_null]
+      - name: report_status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [published, no_sales]
+
   - name: stg_app_store__sales
     description: Apple daily sales report lines, typed, latest load of each file only.
     columns:

@@ -29,12 +29,24 @@ models:
   - name: daily_kpis
     description: >
       One row per day since launch (2026-04-02): App Store downloads next to website
-      traffic. Site columns are NULL before Cloudflare tracking started (2026-10-21).
+      traffic. NULL means unknown, 0 means a real quiet day: download columns are NULL
+      until Apple has answered for that day (see app_store_report_status); site columns
+      are NULL before Cloudflare tracking started (2026-10-21).
     columns:
       - name: date
         data_tests: [unique, not_null]
       - name: first_time_downloads
-        description: New installs (Apple product types 1, 1F, 1T, F1). Matches the site counter.
-        data_tests: [not_null]
+        description: >
+          New installs (Apple product types 1, 1F, 1T, F1). Matches the site counter.
+          NULL while app_store_report_status = 'pending'.
+      - name: app_store_report_status
+        description: >
+          published (Apple report loaded), no_sales (Apple confirmed none), or pending
+          (no answer yet; Apple usually publishes within a day or two).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [published, no_sales, pending]
       - name: chronic_health_page_views
         description: Page views of /projects/chronic-health on jacksoncurtis.me.

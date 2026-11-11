@@ -28,3 +28,18 @@ sources:
             description: R2 path of the file this row came from.
           - name: _loaded_at
             description: When COPY INTO loaded the row.
+      - name: sales_daily_files
+        description: >
+          Inventory of every object under raw/app_store/sales_daily/ in R2 (from a stage
+          LIST at load time). Includes the empty _NO_REPORT markers the extractor writes
+          for settled days where Apple returned 404, which COPY INTO can't load as rows.
+          Append-only: one row per new (file_path, md5).
+        config:
+          loaded_at_field: _listed_at
+        columns:
+          - name: file_path
+            description: Full stage path, e.g. s3compat://.../report_date=2026-07-22/_NO_REPORT.
+          - name: md5
+            description: Object checksum; a re-pulled file with new bytes gets a new row.
+          - name: _listed_at
+            description: When the load job first saw this (path, md5).

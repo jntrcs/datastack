@@ -1,6 +1,8 @@
 -- One row per day since app launch: the app funnel next to website traffic.
--- Grain: date. Days with no activity are present with zeros (date spine), so
--- charts and averages don't silently skip quiet days.
+-- Grain: date. Every day is present (date spine), so charts and averages don't
+-- silently skip quiet days. A quiet day is 0; an UNKNOWN day is NULL:
+--   downloads: NULL until Apple has answered for that day (report or confirmed none)
+--   site:      NULL before Cloudflare tracking started
 
 {% set app_id = '6760903362' %}
 {% set launch_date = '2026-04-02' %}
@@ -28,6 +30,13 @@ downloads as (
 
 ),
 
+app_store_days as (
+
+    -- Days Apple has answered for. Absent = not published yet / not extracted.
+    select report_date, report_status from {{ ref('stg_app_store__report_days') }}
+
+),
+
 site as (
 
     select
@@ -52,9 +61,13 @@ site_coverage as (
 
 select
     days.date_day                                       as date,
-    coalesce(downloads.first_time_downloads, 0)         as first_time_downloads,
-    coalesce(downloads.redownloads, 0)                  as redownloads,
-    coalesce(downloads.updates, 0)                      as updates,
+    iff(app_store_days.report_date is not null, coalesce(downloads.first_time_downloads, 0), null)
+                                                        as first_time_downloads,
+    iff(app_store_days.report_date is not null, coalesce(downloads.redownloads, 0), null)
+                                                        as redownloads,
+    iff(app_store_days.report_date is not null, coalesce(downloads.updates, 0), null)
+                                                        as updates,
+    coalesce(app_store_days.report_status, 'pending')   as app_store_report_status,
     iff(days.date_day >= site_coverage.first_site_date, coalesce(site.site_pageviews, 0), null)
                                                         as site_pageviews,
     iff(days.date_day >= site_coverage.first_site_date, coalesce(site.site_visits, 0), null)
@@ -65,5 +78,6 @@ select
 
 from days
 cross join site_coverage
+left join app_store_days on app_store_days.report_date = days.date_day
 left join downloads on downloads.report_date = days.date_day
 left join site on site.visit_date = days.date_day

@@ -55,7 +55,10 @@ def run(sql: str) -> None:
                 else:
                     print(f"ok  {first}: no new files")
                 continue
-            if cur.description and rows and not first.upper().startswith(("CREATE", "GRANT", "ALTER", "USE")):
+            if first.upper().startswith("LIST"):
+                print(f"ok  {first}: {len(rows)} files")
+                continue
+            if cur.description and rows and not first.upper().startswith(("CREATE", "GRANT", "ALTER", "USE", "INSERT")):
                 cols = [d[0] for d in cur.description]
                 print(f"-- {first}")
                 print("   " + " | ".join(cols))
