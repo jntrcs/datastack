@@ -27,7 +27,22 @@ snapshots:
         select: ["REPORTER"]
     columns:
       - name: country_code
+        description: App Store storefront (lower case, e.g. us). One current row per storefront.
         data_tests: [not_null]
+      - name: app_id
+        description: '{{ doc("app_id") }}'
+      - name: rating_count
+        description: Total star ratings in this storefront, all versions.
+      - name: average_rating
+        description: Average stars (1-5) in this storefront.
+      - name: app_version
+        description: App version live when this rating version was captured. Not tracked for changes.
+      - name: extracted_at
+        description: When the extractor fetched the values that started this version.
+      - name: dbt_scd_id
+        description: dbt's unique ID for this version row.
+      - name: dbt_updated_at
+        description: dbt's bookkeeping timestamp for this version.
       - name: dbt_valid_from
         description: When this version was first seen (snapshot run time, not Apple's time).
       - name: dbt_valid_to

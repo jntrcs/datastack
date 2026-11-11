@@ -15,3 +15,6 @@ dbt/.user.yml
 !README.md
 .wrangler/
 node_modules/
+
+# dbt doc blocks (column definitions shown in dbt docs); contain no IDs.
+!dbt/models/**/*.md

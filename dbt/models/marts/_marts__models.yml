@@ -2,27 +2,55 @@ version: 2
 
 models:
   - name: fct_app_downloads_daily
-    description: App Store transactions (units) per day, country, device and event type.
+    description: >
+      App Store transactions (units) per day, country, device and event type, from the
+      Sales report. The source of truth for download counts.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [report_date, app_id, country_code, device, event_type]
     columns:
+      - name: report_date
+        description: Apple's report day (Pacific time).
+      - name: app_id
+        description: '{{ doc("app_id") }}'
+      - name: country_code
+        description: '{{ doc("country_code") }}'
+      - name: device
+        description: '{{ doc("device") }}'
       - name: event_type
         description: first_download, redownload, update, or unknown (code not in the seed).
         data_tests:
           - accepted_values:
               arguments:
                 values: [first_download, redownload, update, unknown]
+      - name: units
+        description: Number of transactions. Can be negative for refunds.
 
   - name: fct_site_traffic_daily
-    description: Non-bot website traffic per day, page, referrer, country and device.
+    description: Non-bot website traffic (jacksoncurtis.me) per day, page, referrer, country and device.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns:
               [visit_date, request_host, request_path, referer_host, country_code, device_type]
     columns:
+      - name: visit_date
+        description: Day of the visit (UTC, as Cloudflare reports it).
+      - name: request_host
+        description: Site hostname that was visited.
+      - name: request_path
+        description: Page path, e.g. /projects/chronic-health.
+      - name: referer_host
+        description: Where the visitor came from; '(direct)' when there was no referrer.
+      - name: country_code
+        description: '{{ doc("country_code") }}'
+      - name: device_type
+        description: desktop, mobile or tablet.
+      - name: pageviews
+        description: Page loads. Estimated (scaled up) when is_sampled is true.
+      - name: visits
+        description: Visits (sessions) that started on this page. Estimated when is_sampled.
       - name: is_sampled
         description: True when Cloudflare sampled the underlying data (counts are estimates).
 
@@ -30,22 +58,35 @@ models:
     description: >
       App Store funnel per day, source, country and device: impressions -> product page
       views -> Get taps -> first-time downloads, all from Apple's Analytics Reports.
-      Starts ~2026-10-06 (Apple keeps ~35 days; we've kept every file since).
+      Starts ~2026-10-06 (Apple keeps ~35 days; we've kept every file since). Not a strict
+      funnel: search users can download straight from results without a page view.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [event_date, app_id, source_type, country_code, device]
     columns:
+      - name: event_date
+        description: '{{ doc("apple_event_date") }}'
+      - name: app_id
+        description: '{{ doc("app_id") }}'
       - name: source_type
         description: How the user got there (App Store search, App Store browse, App referrer, Web referrer, Unavailable).
+      - name: country_code
+        description: '{{ doc("country_code") }}'
+      - name: device
+        description: '{{ doc("device") }}'
       - name: impressions
         description: Times the app was shown (search results, browse, product page...).
       - name: product_page_views
         description: Views of the app's product page.
       - name: get_taps
-        description: Taps on Get (from search results or the product page). Download intent.
+        description: >
+          Taps on Get (from search results or the product page). Download intent. Apple
+          attributes taps and downloads to sources differently, so don't divide across sources.
       - name: first_time_downloads
         description: First-time downloads per the Analytics Reports (use the Sales report for official counts).
+      - name: redownloads
+        description: Downloads by someone who had the app before.
 
   - name: fct_app_sessions_daily
     description: In-app sessions and total session time per day, app version, device and country.
@@ -53,20 +94,42 @@ models:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [event_date, app_id, app_version, device, country_code]
+    columns:
+      - name: event_date
+        description: '{{ doc("apple_event_date") }}'
+      - name: app_id
+        description: '{{ doc("app_id") }}'
+      - name: app_version
+        description: App version the sessions ran on, e.g. 2.6.0.
+      - name: device
+        description: '{{ doc("device") }}'
+      - name: country_code
+        description: '{{ doc("country_code") }}'
+      - name: sessions
+        description: Times the app was opened and used.
+      - name: total_session_seconds
+        description: Total time in the app, in seconds. Average length = sum(seconds) / sum(sessions).
 
   - name: daily_kpis
     description: >
-      One row per day since launch (2026-04-02): App Store downloads next to website
-      traffic. NULL means unknown, 0 means a real quiet day: download columns are NULL
-      until Apple has answered for that day (see app_store_report_status); site columns
-      are NULL before Cloudflare tracking started (2026-10-21).
+      One row per day since launch (2026-04-02): App Store downloads, funnel and usage
+      next to website traffic. NULL means unknown, 0 means a real quiet day: download
+      columns are NULL until Apple has answered for that day (see app_store_report_status);
+      site columns are NULL before Cloudflare tracking started (2026-10-21); funnel and
+      session columns are NULL before ~2026-10-06. No rate columns on purpose: compute
+      rates as sum(numerator) / sum(denominator) over the period.
     columns:
       - name: date
+        description: Calendar day. Every day since launch is present.
         data_tests: [unique, not_null]
       - name: first_time_downloads
         description: >
           New installs (Apple product types 1, 1F, 1T, F1). Matches the site counter.
           NULL while app_store_report_status = 'pending'.
+      - name: redownloads
+        description: Downloads by someone who had the app before (Sales report).
+      - name: updates
+        description: App updates installed (Sales report).
       - name: app_store_report_status
         description: >
           published (Apple report loaded), no_sales (Apple confirmed none), or pending
@@ -76,15 +139,25 @@ models:
           - accepted_values:
               arguments:
                 values: [published, no_sales, pending]
+      - name: site_pageviews
+        description: All non-bot page loads on jacksoncurtis.me.
+      - name: site_visits
+        description: All non-bot visits on jacksoncurtis.me.
       - name: chronic_health_page_views
         description: Page views of /projects/chronic-health on jacksoncurtis.me.
+      - name: is_site_sampled
+        description: True when any of the day's site numbers are Cloudflare estimates.
       - name: app_store_impressions
         description: App Store impressions (Analytics Reports). NULL before coverage (~2026-10-06).
       - name: app_store_product_page_views
         description: App Store product page views. NULL before coverage.
+      - name: app_store_get_taps
+        description: Taps on Get in the App Store. NULL before coverage.
       - name: app_store_funnel_downloads
         description: >
           First-time downloads per the Analytics Reports, for funnel ratios only.
           first_time_downloads (Sales report) is the official count.
       - name: app_sessions
         description: In-app sessions. NULL before coverage.
+      - name: app_session_seconds
+        description: Total time in the app (seconds). NULL before coverage.
