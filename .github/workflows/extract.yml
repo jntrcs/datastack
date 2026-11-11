@@ -1,4 +1,4 @@
-name: Nightly extract + load
+name: Nightly extract + load + dbt build
 
 on:
   # Started nightly at 14:17 UTC by a Cloudflare Worker (see scheduler/), not by
@@ -8,7 +8,7 @@ on:
 jobs:
   extract:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       LANDING: r2://datastack-raw
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
@@ -23,6 +23,10 @@ jobs:
       SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}          # LOADER_SVC service user
       SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+      # dbt runs as its own service user (TRANSFORMER role) — see dbt/profiles.yml.
+      DBT_TARGET: prod
+      DBT_SNOWFLAKE_USER: ${{ secrets.DBT_SNOWFLAKE_USER }}  # TRANSFORMER_SVC
+      DBT_SNOWFLAKE_PRIVATE_KEY: ${{ secrets.DBT_SNOWFLAKE_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -46,3 +50,22 @@ jobs:
       - name: Load into Snowflake (RAW)
         if: always() && env.SNOWFLAKE_PRIVATE_KEY != ''
         run: uv run python -m warehouse.sf -f warehouse/sql/02_raw_load.sql
+
+      # ---- Transform (dbt, prod target -> ANALYTICS.STAGING / MARTS) ----
+      # Runs even if an extract failed: rebuilding on slightly stale RAW is harmless,
+      # and the freshness check below is what flags the gap.
+      - name: dbt deps
+        id: dbt_deps
+        if: always() && env.DBT_SNOWFLAKE_PRIVATE_KEY != ''
+        run: bin/dbt deps
+
+      # Warn-only: a stale source shouldn't block rebuilding the marts.
+      - name: dbt source freshness
+        if: always() && steps.dbt_deps.outcome == 'success'
+        continue-on-error: true
+        run: bin/dbt source freshness
+
+      # build = run + test in DAG order; a failing test stops its downstream models.
+      - name: dbt build
+        if: always() && steps.dbt_deps.outcome == 'success'
+        run: bin/dbt build
