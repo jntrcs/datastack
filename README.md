@@ -2,13 +2,12 @@
 
 A deliberately over-engineered data pipeline for a tiny dataset. I wanted to understand
 the "modern data stack" (Snowflake, dbt, and eventually Databricks) by building one end
-to end, so I had [Claude Code](https://claude.com/claude-code) set it up with me for the
-silliest data I own: download numbers for my iPhone app, **Chronic Health**, and traffic
+to end, so I had [Claude Code](https://claude.com/claude-code) set it up with me on real data I care about:
+download numbers for my iPhone app, **Chronic Health**, and traffic
 to my personal website.
 
-The whole warehouse fits in a few hundred rows. That's the point: the data is small
-enough to reason about completely, so the interesting parts are the *patterns* (ELT,
-raw vs staging vs marts, tests, freshness, cost controls), not the volume.
+The whole warehouse fits in a few hundred rows. The goal is to replicate the process that a business
+would go through, not the scale.
 
 ## The raw data sources
 
