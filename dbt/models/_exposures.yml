@@ -1,0 +1,16 @@
+version: 2
+
+exposures:
+  - name: databricks_download_forecast
+    label: Download forecast (Databricks)
+    type: ml
+    maturity: medium
+    description: >
+      Nightly Prophet forecast of first-time downloads (lakehouse/forecast_downloads.py),
+      reading daily_kpis in place through Databricks Lakehouse Federation as DATABRICKS_SVC
+      (REPORTER role). Feeds the Databricks AI/BI dashboard "Chronic Health Download Forecast".
+      Renaming or dropping first_time_downloads or date breaks it.
+    depends_on:
+      - ref('daily_kpis')
+    owner:
+      name: Jackson Curtis

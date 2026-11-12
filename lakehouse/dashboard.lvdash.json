@@ -1,0 +1,440 @@
+{
+  "datasets": [
+    {
+      "name": "kpis",
+      "displayName": "Headline numbers",
+      "queryLines": [
+        "select max(cumulative_actual) as downloads_to_date,\n",
+        "  date_format(any_value(milestone_date_p50), 'MMM d, yyyy') as milestone_p50,\n",
+        "  concat(date_format(any_value(milestone_date_p10), 'MMM d'), ' \u2013 ', date_format(any_value(milestone_date_p90), 'MMM d')) as milestone_range,\n",
+        "  round(any_value(holdout_mae), 1) as mae, round(any_value(holdout_mae_naive), 1) as mae_naive,\n",
+        "  round(100 * (1 - any_value(holdout_mae) / any_value(holdout_mae_naive))) as skill_pct,\n",
+        "  round(100 * any_value(holdout_interval_coverage)) as coverage_pct,\n",
+        "  date_format(any_value(generated_at), 'yyyy-MM-dd HH:mm') as generated_at\n",
+        "from workspace.forecasting.download_forecast"
+      ]
+    },
+    {
+      "name": "daily",
+      "displayName": "Daily downloads: actual vs forecast",
+      "queryLines": [
+        "select date, series, value from workspace.forecasting.download_forecast\n",
+        "unpivot (value for series in (actual as `Actual`, yhat as `Forecast`, yhat_lower as `Forecast 80% low`, yhat_upper as `Forecast 80% high`))\n",
+        "where value is not null"
+      ]
+    },
+    {
+      "name": "cumulative",
+      "displayName": "Cumulative downloads trajectory",
+      "queryLines": [
+        "select date, series, value from (select date, cumulative_actual, cumulative_yhat, cumulative_lower, cumulative_upper, cast(milestone as double) as goal from workspace.forecasting.download_forecast)\n",
+        "unpivot (value for series in (cumulative_actual as `Actual`, cumulative_yhat as `Forecast (median)`, cumulative_lower as `Forecast 80% low`, cumulative_upper as `Forecast 80% high`, goal as `Goal: 1,000`))\n",
+        "where value is not null"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "forecast",
+      "displayName": "Forecast",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Chronic Health \u2014 first-time download forecast\n",
+                "Prophet on sqrt(daily downloads), weekly seasonality, refit nightly 15:00 UTC on the dbt mart `ANALYTICS.MARTS.DAILY_KPIS` in Snowflake (read in place via Lakehouse Federation). Bands are 80% intervals from 1,000 simulated futures. Run history in MLflow."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "c_total",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpis",
+                  "fields": [
+                    {
+                      "name": "downloads_to_date",
+                      "expression": "`downloads_to_date`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "downloads_to_date",
+                  "displayName": "Downloads to date"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Downloads to date"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "c_p50",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpis",
+                  "fields": [
+                    {
+                      "name": "milestone_p50",
+                      "expression": "`milestone_p50`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "milestone_p50",
+                  "displayName": "Crosses 1,000 (median)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Crosses 1,000 (median)"
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "c_range",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpis",
+                  "fields": [
+                    {
+                      "name": "milestone_range",
+                      "expression": "`milestone_range`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "milestone_range",
+                  "displayName": "80% range"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "80% range"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "c_skill",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpis",
+                  "fields": [
+                    {
+                      "name": "skill_pct",
+                      "expression": "`skill_pct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "skill_pct",
+                  "displayName": "% better than naive"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "% better than naive",
+                "showDescription": true,
+                "description": "Holdout MAE vs 'average of last 28 days', last 28 days held out"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "c_cov",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpis",
+                  "fields": [
+                    {
+                      "name": "coverage_pct",
+                      "expression": "`coverage_pct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "coverage_pct",
+                  "displayName": "80% band coverage (%)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "80% band coverage (%)",
+                "showDescription": true,
+                "description": "Share of holdout days inside the 80% band; \u224880 = honest bands"
+              }
+            }
+          },
+          "position": {
+            "x": 5,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "l_cum",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cumulative",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    },
+                    {
+                      "name": "series",
+                      "expression": "`series`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "date",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Date"
+                },
+                "y": {
+                  "fieldName": "value",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "First-time downloads"
+                },
+                "color": {
+                  "fieldName": "series",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Series"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Cumulative trajectory toward 1,000",
+                "showDescription": true,
+                "description": "Actual running total, then the median simulated path and its 80% band"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "l_daily",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "daily",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    },
+                    {
+                      "name": "series",
+                      "expression": "`series`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "date",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Date"
+                },
+                "y": {
+                  "fieldName": "value",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "First-time downloads"
+                },
+                "color": {
+                  "fieldName": "series",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Series"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Daily first-time downloads",
+                "showDescription": true,
+                "description": "Apple Sales reports (dbt mart). Forecast = expected downloads/day; band = 80% of simulated days"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "c_gen",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpis",
+                  "fields": [
+                    {
+                      "name": "generated_at",
+                      "expression": "`generated_at`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "generated_at",
+                  "displayName": "Forecast generated (UTC)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Forecast generated (UTC)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 19,
+            "width": 2,
+            "height": 2
+          }
+        }
+      ]
+    }
+  ]
+}
