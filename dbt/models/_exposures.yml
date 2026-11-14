@@ -14,3 +14,32 @@ exposures:
       - ref('daily_kpis')
     owner:
       name: Jackson Curtis
+
+  - name: streamlit_growth_dashboard
+    label: Chronic Health growth (Streamlit in Snowflake)
+    type: dashboard
+    maturity: medium
+    url: https://app.snowflake.com/#/streamlit-apps/ANALYTICS.DASHBOARDS.CHRONIC_HEALTH_GROWTH
+    description: >
+      Internal dashboard (dashboards/streamlit/), running inside Snowflake as an app owned
+      by REPORTER. Headline downloads/ratings/reviews tiles and weekly charts.
+    depends_on:
+      - ref('current_kpis')
+      - ref('weekly_kpis')
+    owner:
+      name: Jackson Curtis
+
+  - name: site_datastack_page
+    label: jacksoncurtis.me/projects/datastack (reverse ETL)
+    type: application
+    maturity: medium
+    url: https://jacksoncurtis.me/projects/datastack
+    description: >
+      Public page. serve/site_export.py (as REVERSE_ETL_SVC) exports these marts nightly
+      to r2://datastack-raw/serve/site/dashboard.json; the site Worker serves it at
+      /api/datastack. Renaming a column used in WEEKLY_COLUMNS breaks the page.
+    depends_on:
+      - ref('current_kpis')
+      - ref('weekly_kpis')
+    owner:
+      name: Jackson Curtis

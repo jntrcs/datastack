@@ -14,3 +14,8 @@ dependencies = [
     "requests>=2.34.2",
     "snowflake-connector-python>=5.2.0",
 ]
+
+[dependency-groups]
+dev = [
+    "streamlit>=1.67.0",
+]

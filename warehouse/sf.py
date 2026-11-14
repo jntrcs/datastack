@@ -16,19 +16,21 @@ import snowflake.connector
 from dotenv import load_dotenv
 
 
-def connect(**overrides):
+def connect(prefix: str = "", **overrides):
+    """prefix picks another identity's env vars, e.g. prefix="REVERSE_ETL_" reads
+    REVERSE_ETL_SNOWFLAKE_USER / _PRIVATE_KEY / _PRIVATE_KEY_PATH."""
     load_dotenv()
-    params = dict(account=os.environ["SNOWFLAKE_ACCOUNT"], user=os.environ["SNOWFLAKE_USER"])
-    if os.environ.get("SNOWFLAKE_PRIVATE_KEY"):
+    params = dict(account=os.environ["SNOWFLAKE_ACCOUNT"], user=os.environ[f"{prefix}SNOWFLAKE_USER"])
+    if os.environ.get(f"{prefix}SNOWFLAKE_PRIVATE_KEY"):
         # CI: the key's PEM contents come from a secret.
         from cryptography.hazmat.primitives import serialization
 
-        key = serialization.load_pem_private_key(os.environ["SNOWFLAKE_PRIVATE_KEY"].encode(), password=None)
+        key = serialization.load_pem_private_key(os.environ[f"{prefix}SNOWFLAKE_PRIVATE_KEY"].encode(), password=None)
         params["private_key"] = key.private_bytes(
             serialization.Encoding.DER, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
         )
     else:
-        params["private_key_file"] = str(Path(os.environ["SNOWFLAKE_PRIVATE_KEY_PATH"]).expanduser())
+        params["private_key_file"] = str(Path(os.environ[f"{prefix}SNOWFLAKE_PRIVATE_KEY_PATH"]).expanduser())
     params.update(overrides)
     return snowflake.connector.connect(**params)
 

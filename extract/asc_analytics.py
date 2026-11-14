@@ -6,6 +6,7 @@ Usage:
     uv run python -m extract.asc_analytics 2026-10-07             # one processing day
     uv run python -m extract.asc_analytics 2026-10-07 2026-11-11  # a range (backfill)
     uv run python -m extract.asc_analytics all                    # everything Apple still has
+    ASC_ANALYTICS_REPORTS=downloads_detailed uv run python -m extract.asc_analytics all  # one report
 
 Each report instance lands at:
     raw/app_store/analytics/<report>/processing_date=YYYY-MM-DD/segment_<n>.tsv.gz
@@ -40,6 +41,11 @@ REPORTS = {
     "discovery_engagement": "App Store Discovery and Engagement Standard",
     "downloads": "App Downloads Standard",
     "sessions": "App Sessions Standard",
+    # Detailed = Standard + Source Info (the referring app / website), Campaign and
+    # Page Title. The price: Apple drops low-count rows for privacy, so Detailed
+    # totals are LOWER than Standard. Use them for "who referred", never for totals.
+    "discovery_engagement_detailed": "App Store Discovery and Engagement Detailed",
+    "downloads_detailed": "App Downloads Detailed",
 }
 
 
@@ -85,7 +91,7 @@ def extract_report(tok: str, slug: str, report_id: str, start: date | None, end:
             res = requests.get(seg["attributes"]["url"], timeout=120)  # pre-signed; no auth header
             res.raise_for_status()
             key = f"{PREFIX}/{slug}/processing_date={day.isoformat()}/segment_{n}.tsv.gz"
-            print(f"{slug:<22} {day} {len(res.content):>7} bytes -> {land(key, res.content)}")
+            print(f"{slug:<30} {day} {len(res.content):>7} bytes -> {land(key, res.content)}")
 
 
 def main(argv: list[str]) -> None:
@@ -100,7 +106,10 @@ def main(argv: list[str]) -> None:
 
     tok = asc.token()
     request_id = ongoing_request_id(tok, os.environ.get("ASC_APP_ID", "6760903362"))
+    only = [r for r in os.environ.get("ASC_ANALYTICS_REPORTS", "").split(",") if r]
     for slug, report_id in report_ids(tok, request_id).items():
+        if only and slug not in only:
+            continue
         extract_report(tok, slug, report_id, start, end)
 
 

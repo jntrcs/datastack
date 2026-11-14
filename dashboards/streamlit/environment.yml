@@ -1,0 +1,8 @@
+# Packages for the Streamlit in Snowflake app, from Snowflake's Anaconda channel.
+# streamlit and snowflake-snowpark-python are provided by the runtime.
+name: sf_env
+channels:
+  - snowflake
+dependencies:
+  - altair
+  - pandas

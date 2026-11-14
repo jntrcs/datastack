@@ -27,6 +27,9 @@ jobs:
       DBT_TARGET: prod
       DBT_SNOWFLAKE_USER: ${{ secrets.DBT_SNOWFLAKE_USER }}  # TRANSFORMER_SVC
       DBT_SNOWFLAKE_PRIVATE_KEY: ${{ secrets.DBT_SNOWFLAKE_PRIVATE_KEY }}
+      # Reverse ETL export runs as a third service user (REPORTER: read marts only).
+      REVERSE_ETL_SNOWFLAKE_USER: ${{ secrets.REVERSE_ETL_SNOWFLAKE_USER }}  # REVERSE_ETL_SVC
+      REVERSE_ETL_SNOWFLAKE_PRIVATE_KEY: ${{ secrets.REVERSE_ETL_SNOWFLAKE_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -44,7 +47,7 @@ jobs:
 
       # Apple keeps only ~35 days of these, so a missed week is recoverable but a
       # missed month is not. Defaults to the last 5 processing days.
-      - name: App Store analytics (impressions, page views, sessions)
+      - name: App Store analytics (impressions, page views, sessions, referrers)
         if: always()
         run: uv run python -m extract.asc_analytics
 
@@ -52,6 +55,11 @@ jobs:
       - name: App Store ratings (every storefront)
         if: always()
         run: uv run python -m extract.app_store_ratings
+
+      # Written reviews: the full list every day (tiny), so deletions show up too.
+      - name: App Store reviews
+        if: always()
+        run: uv run python -m extract.app_store_reviews
 
       - name: Cloudflare Web Analytics
         if: always()  # run even if the Apple step failed
@@ -78,5 +86,13 @@ jobs:
 
       # build = run + test in DAG order; a failing test stops its downstream models.
       - name: dbt build
+        id: dbt_build
         if: always() && steps.dbt_deps.outcome == 'success'
         run: bin/dbt build
+
+      # ---- Serve: reverse ETL (marts -> R2 JSON -> jacksoncurtis.me/projects/datastack) ----
+      # Only after a fully passing build: if a test failed, the site keeps showing
+      # yesterday's numbers instead of possibly-wrong new ones.
+      - name: Export dashboard JSON for jacksoncurtis.me
+        if: steps.dbt_build.outcome == 'success' && env.REVERSE_ETL_SNOWFLAKE_PRIVATE_KEY != ''
+        run: uv run python -m serve.site_export

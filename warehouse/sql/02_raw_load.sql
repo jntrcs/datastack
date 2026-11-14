@@ -135,6 +135,62 @@ FROM (
 PATTERN = '.*/segment_[0-9]+[.]tsv[.]gz'
 FILE_FORMAT = (FORMAT_NAME = TSV_GZ_HEADER);
 
+-- Detailed variants: Standard's columns + Source Info (referring app bundle id or web
+-- domain), Campaign and Page Title. Apple suppresses low-count rows in these, so their
+-- totals are lower than Standard's: use them for attribution only.
+CREATE TABLE IF NOT EXISTS RAW.APP_STORE.ANALYTICS_DISCOVERY_ENGAGEMENT_DETAILED (
+  date VARCHAR, app_name VARCHAR, app_apple_identifier VARCHAR, event VARCHAR,
+  page_type VARCHAR, page_title VARCHAR, source_type VARCHAR, source_info VARCHAR,
+  campaign VARCHAR, engagement_type VARCHAR, device VARCHAR, platform_version VARCHAR,
+  territory VARCHAR, counts VARCHAR, unique_counts VARCHAR,
+  _source_file VARCHAR, _source_file_modified TIMESTAMP_TZ, _source_row NUMBER,
+  _loaded_at TIMESTAMP_TZ
+);
+
+COPY INTO RAW.APP_STORE.ANALYTICS_DISCOVERY_ENGAGEMENT_DETAILED
+FROM (
+  SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+         METADATA$FILENAME, METADATA$FILE_LAST_MODIFIED, METADATA$FILE_ROW_NUMBER,
+         CURRENT_TIMESTAMP()
+  FROM @R2_RAW/app_store/analytics/discovery_engagement_detailed/
+)
+PATTERN = '.*/segment_[0-9]+[.]tsv[.]gz'
+FILE_FORMAT = (FORMAT_NAME = TSV_GZ_HEADER);
+
+CREATE TABLE IF NOT EXISTS RAW.APP_STORE.ANALYTICS_DOWNLOADS_DETAILED (
+  date VARCHAR, app_name VARCHAR, app_apple_identifier VARCHAR, download_type VARCHAR,
+  app_version VARCHAR, device VARCHAR, platform_version VARCHAR, source_type VARCHAR,
+  source_info VARCHAR, campaign VARCHAR, page_type VARCHAR, page_title VARCHAR,
+  pre_order VARCHAR, territory VARCHAR, counts VARCHAR,
+  _source_file VARCHAR, _source_file_modified TIMESTAMP_TZ, _source_row NUMBER,
+  _loaded_at TIMESTAMP_TZ
+);
+
+COPY INTO RAW.APP_STORE.ANALYTICS_DOWNLOADS_DETAILED
+FROM (
+  SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+         METADATA$FILENAME, METADATA$FILE_LAST_MODIFIED, METADATA$FILE_ROW_NUMBER,
+         CURRENT_TIMESTAMP()
+  FROM @R2_RAW/app_store/analytics/downloads_detailed/
+)
+PATTERN = '.*/segment_[0-9]+[.]tsv[.]gz'
+FILE_FORMAT = (FORMAT_NAME = TSV_GZ_HEADER);
+
+-- ------------------------------------------------------- App Store reviews
+-- One row per daily file: the full list of written reviews (App Store Connect API).
+CREATE TABLE IF NOT EXISTS RAW.APP_STORE.REVIEWS_DAILY (
+  record VARIANT,
+  _source_file VARCHAR, _source_file_modified TIMESTAMP_TZ, _loaded_at TIMESTAMP_TZ
+);
+
+COPY INTO RAW.APP_STORE.REVIEWS_DAILY
+FROM (
+  SELECT $1, METADATA$FILENAME, METADATA$FILE_LAST_MODIFIED, CURRENT_TIMESTAMP()
+  FROM @R2_RAW/app_store/reviews_daily/
+)
+PATTERN = '.*/reviews[.]json'
+FILE_FORMAT = (FORMAT_NAME = JSON_DOC);
+
 -- ------------------------------------------------------- App Store ratings
 -- One row per daily file: Apple's lookup response for every storefront, as JSON.
 -- Apple only serves the CURRENT rating, so these daily files are the only history.
@@ -182,4 +238,14 @@ SELECT 'app_store.analytics_downloads', COUNT(*), COUNT(DISTINCT _source_file), 
 FROM RAW.APP_STORE.ANALYTICS_DOWNLOADS
 UNION ALL
 SELECT 'app_store.analytics_sessions', COUNT(*), COUNT(DISTINCT _source_file), MIN(date), MAX(_loaded_at)
-FROM RAW.APP_STORE.ANALYTICS_SESSIONS;
+FROM RAW.APP_STORE.ANALYTICS_SESSIONS
+UNION ALL
+SELECT 'app_store.analytics_discovery_engagement_detailed', COUNT(*), COUNT(DISTINCT _source_file), MIN(date), MAX(_loaded_at)
+FROM RAW.APP_STORE.ANALYTICS_DISCOVERY_ENGAGEMENT_DETAILED
+UNION ALL
+SELECT 'app_store.analytics_downloads_detailed', COUNT(*), COUNT(DISTINCT _source_file), MIN(date), MAX(_loaded_at)
+FROM RAW.APP_STORE.ANALYTICS_DOWNLOADS_DETAILED
+UNION ALL
+SELECT 'app_store.reviews_daily', COUNT(*), COUNT(DISTINCT _source_file),
+       MIN(record:extracted_at::STRING), MAX(_loaded_at)
+FROM RAW.APP_STORE.REVIEWS_DAILY;

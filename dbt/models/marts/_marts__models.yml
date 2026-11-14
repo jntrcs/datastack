@@ -145,8 +145,16 @@ models:
         description: All non-bot visits on jacksoncurtis.me.
       - name: chronic_health_page_views
         description: Page views of /projects/chronic-health on jacksoncurtis.me.
+      - name: site_visits_jacksoncurtis_me
+        description: Non-bot visits to jacksoncurtis.me. NULL before its tracking started.
+      - name: site_visits_chronichealth
+        description: >
+          Non-bot visits to chronichealth.jacksoncurtis.me. NULL before its Cloudflare
+          beacon was added (no tracking there before 2026-11).
       - name: is_site_sampled
         description: True when any of the day's site numbers are Cloudflare estimates.
+      - name: app_store_search_impressions
+        description: App Store impressions from search results only. NULL before coverage.
       - name: app_store_impressions
         description: App Store impressions (Analytics Reports). NULL before coverage (~2026-10-06).
       - name: app_store_product_page_views
@@ -161,3 +169,63 @@ models:
         description: In-app sessions. NULL before coverage.
       - name: app_session_seconds
         description: Total time in the app (seconds). NULL before coverage.
+
+  - name: weekly_kpis
+    description: >
+      Dashboard metrics per Monday-start week, rolled up from daily_kpis. Complete weeks
+      only, and each metric is NULL unless all 7 of its days are known (so a week where
+      tracking started mid-week, or where Apple hasn't published a day yet, isn't
+      mistaken for a dip). Feeds the Streamlit app and the jacksoncurtis.me page.
+    columns:
+      - name: week_start
+        description: Monday of the week.
+        data_tests: [unique, not_null]
+      - name: week_end
+        description: Sunday of the week.
+      - name: first_time_downloads
+        description: First-time downloads (Sales report, the official count).
+      - name: app_store_impressions
+        description: All App Store impressions.
+      - name: app_store_search_impressions
+        description: App Store impressions in search results.
+      - name: app_store_product_page_views
+        description: App Store product page views, all sources.
+      - name: site_visits
+        description: Visits across all tracked sites.
+      - name: site_visits_jacksoncurtis_me
+        description: >
+          Visits to jacksoncurtis.me. Cloudflare doesn't count unique visitors (no
+          cookies); a visit is a page load that came from another site or direct.
+      - name: site_visits_chronichealth
+        description: Visits to chronichealth.jacksoncurtis.me.
+      - name: is_site_sampled
+        description: True when any site number in the week is a Cloudflare estimate.
+
+  - name: current_kpis
+    description: >
+      One row of headline numbers for the dashboards: total downloads, ratings, reviews
+      with as-of dates.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "reviews_count <= ratings_count"
+          config:
+            severity: warn
+    columns:
+      - name: total_first_time_downloads
+        description: All first-time downloads since launch (Sales report).
+        data_tests: [not_null]
+      - name: downloads_as_of
+        description: Latest day Apple has reported downloads for.
+      - name: ratings_count
+        description: Star ratings across all storefronts (public lookup API).
+      - name: average_rating
+        description: Worldwide average stars, weighted by each storefront's count.
+      - name: ratings_as_of
+        description: Date of the latest ratings extract.
+      - name: reviews_count
+        description: Written reviews (title + text), all storefronts. Always <= ratings_count.
+      - name: reviews_as_of
+        description: Date of the latest reviews extract.
+      - name: built_at
+        description: When dbt built this row.

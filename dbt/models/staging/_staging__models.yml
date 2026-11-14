@@ -118,3 +118,20 @@ models:
     columns:
       - name: country_code
         data_tests: [unique, not_null]
+
+  - name: stg_app_store__reviews
+    description: >
+      Written App Store reviews (rating + title + text) as of the latest daily extract.
+      Every review is also a rating, so this count is always <= the ratings count.
+    columns:
+      - name: review_id
+        data_tests: [unique, not_null]
+      - name: rating
+        description: Stars, 1-5.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
+      - name: territory_alpha3
+        description: Storefront as an ISO alpha-3 code (USA, CAN), unlike ratings' alpha-2.

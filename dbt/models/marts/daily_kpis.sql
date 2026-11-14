@@ -9,6 +9,8 @@
 
 {% set app_id = '6760903362' %}
 {% set launch_date = '2026-04-02' %}
+{% set career_site = 'jacksoncurtis.me' %}
+{% set app_site = 'chronichealth.jacksoncurtis.me' %}
 
 with days as (
 
@@ -48,9 +50,22 @@ site as (
         sum(visits)                                                        as site_visits,
         sum(iff(request_path like '/projects/chronic-health%', pageviews, 0))
                                                                            as chronic_health_page_views,
+        sum(iff(request_host = '{{ career_site }}', visits, 0))            as site_visits_career,
+        sum(iff(request_host = '{{ app_site }}', visits, 0))               as site_visits_app,
         boolor_agg(is_sampled)                                             as is_site_sampled
     from {{ ref('fct_site_traffic_daily') }}
     group by 1
+
+),
+
+host_coverage as (
+
+    -- Each site starts being tracked when its Cloudflare beacon was added; before
+    -- that its visits are unknown (NULL), not zero. No rows yet -> NULL every day.
+    select
+        min(iff(request_host = '{{ career_site }}', visit_date, null))  as first_career_site_date,
+        min(iff(request_host = '{{ app_site }}', visit_date, null))     as first_app_site_date
+    from {{ ref('stg_cloudflare__pageloads') }}
 
 ),
 
@@ -61,7 +76,9 @@ funnel as (
         sum(impressions)            as app_store_impressions,
         sum(product_page_views)     as app_store_product_page_views,
         sum(get_taps)               as app_store_get_taps,
-        sum(first_time_downloads)   as app_store_funnel_downloads
+        sum(first_time_downloads)   as app_store_funnel_downloads,
+        sum(iff(source_type = 'App Store search', impressions, 0))
+                                    as app_store_search_impressions
     from {{ ref('fct_app_store_funnel_daily') }}
     where app_id = '{{ app_id }}'
     group by 1
@@ -112,6 +129,10 @@ select
                                                         as site_visits,
     iff(days.date_day >= site_coverage.first_site_date, coalesce(site.chronic_health_page_views, 0), null)
                                                         as chronic_health_page_views,
+    iff(days.date_day >= host_coverage.first_career_site_date, coalesce(site.site_visits_career, 0), null)
+                                                        as site_visits_jacksoncurtis_me,
+    iff(days.date_day >= host_coverage.first_app_site_date, coalesce(site.site_visits_app, 0), null)
+                                                        as site_visits_chronichealth,
     coalesce(site.is_site_sampled, false)               as is_site_sampled,
     iff(days.date_day >= analytics_coverage.first_funnel_date, coalesce(funnel.app_store_impressions, 0), null)
                                                         as app_store_impressions,
@@ -121,6 +142,8 @@ select
                                                         as app_store_get_taps,
     iff(days.date_day >= analytics_coverage.first_funnel_date, coalesce(funnel.app_store_funnel_downloads, 0), null)
                                                         as app_store_funnel_downloads,
+    iff(days.date_day >= analytics_coverage.first_funnel_date, coalesce(funnel.app_store_search_impressions, 0), null)
+                                                        as app_store_search_impressions,
     iff(days.date_day >= analytics_coverage.first_sessions_date, coalesce(sessions.app_sessions, 0), null)
                                                         as app_sessions,
     iff(days.date_day >= analytics_coverage.first_sessions_date, coalesce(sessions.app_session_seconds, 0), null)
@@ -129,6 +152,7 @@ select
 from days
 cross join site_coverage
 cross join analytics_coverage
+cross join host_coverage
 left join app_store_days on app_store_days.report_date = days.date_day
 left join downloads on downloads.report_date = days.date_day
 left join site on site.visit_date = days.date_day

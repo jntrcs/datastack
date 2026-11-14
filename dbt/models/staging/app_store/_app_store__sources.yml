@@ -73,6 +73,21 @@ sources:
           "App Sessions Standard": in-app sessions, total duration (seconds) and unique
           devices, by app version, device, OS, source, page type, download date, territory.
 
+      - name: analytics_discovery_engagement_detailed
+        description: >
+          "App Store Discovery and Engagement Detailed": the Standard report plus Source
+          Info (referring app bundle id / web domain), Campaign and Page Title. Apple
+          suppresses low-count rows, so totals are LOWER than Standard. All columns text.
+      - name: analytics_downloads_detailed
+        description: >
+          "App Downloads Detailed": the Standard downloads report plus Source Info,
+          Campaign and Page Title, with low-count rows suppressed. All columns text.
+
+      - name: reviews_daily
+        description: >
+          One row per day: every written customer review from the App Store Connect API
+          ({app_id, extracted_at, reviews: [...]}), the full list each day.
+
       - name: ratings_daily
         description: >
           One row per day: Apple's public lookup response for every storefront, as JSON
